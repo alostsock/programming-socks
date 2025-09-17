@@ -40,7 +40,6 @@
       const body = document.body;
       const canvas = new OffscreenCanvas(100, 100);
       const ctx = canvas.getContext("2d");
-      ctx.font = window.getComputedStyle(body).getPropertyValue("font");
 
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><path d="M28.4 0c6.8 24.4 7 20.8 5 28.7-2.3 15 .2 13.7 2.3 22.2.8 2.3 1.8 6.8 2.6 11.4 1.4 6.6-.7 7 .2 9.4.7 3.5 1.6 3.5 4 7.9 1.4 1.4 2.9 2.4 6.6 2 2.7-.5 4.4-2.8 2.3-4.2l-4.7-5.8c-1.7-3-2.2-5.4-2.2-11.4 0-9-.1-16.7 1-25.4.6-3.5 1.2-6.1 2.4-11.5.2-2.8 0-6.1-.5-13.4L46 0h7c.3 3.1 0 10.3 0 14.2-.6 14.9-.5 17.4.7 20.8 1.7 14.5 1.8 20.6 1.7 33 0 7.4 2 11-5.7 18.4-3.1 3.3-5.9 2-5.4 7 2.2 2.5 6.9 1.1 9.4.4 3.2-.9 3.3-2.4 6.3-7.4 2.9-2.9 5.8-3.8 3.3-8.5-.6-2.6-1.3-7.7-.6-12.5 2.1-12.6 6-21.9 3.7-35 1.8-14.2 6.4-34 5.9-30.4Z"/></svg>`;
 
@@ -76,53 +75,58 @@
         body.appendChild(span);
       }
 
-      // Get a rough estimate for how large one character is.
-      // Doesn't need to be perfect, as long as we get a square-ish display.
-      const [charW, charH] = measureChars("Programming Socks");
-      const area = charW * charH * text.length;
-      body.style.width = `${Math.sqrt(area)}px`;
+      // Without waiting for everything to load, text size measurement can fail.
+      window.onload = () => {
+        ctx.font = window.getComputedStyle(body).getPropertyValue("font");
 
-      const { width: w, height: h, top: t0, left: l0 } = bounds(body);
-      canvas.width = w;
-      canvas.height = h;
+        // Get a rough estimate for how large one character is.
+        // Doesn't need to be perfect, as long as we get a square-ish display.
+        const [charW, charH] = measureChars("Programming Socks");
+        const area = charW * charH * text.length;
+        body.style.width = `${Math.sqrt(area)}px`;
 
-      const blob = new Blob([svg], { type: "image/svg+xml;" });
-      const dataUrl = URL.createObjectURL(blob);
-      const img = new Image();
-      img.onload = () => {
-        // The svg (100x100px) is almost certainly smaller than the canvas
-        const s = Math.min(w / img.width, h / img.height);
-        ctx.scale(s, s);
-        ctx.drawImage(img, 0, 0);
+        const { width: w, height: h, top: t0, left: l0 } = bounds(body);
+        canvas.width = w;
+        canvas.height = h;
 
-        let stripeWidth = 2;
-        let row = 0;
-        let legs = [false, false];
-        let xPrev = 0;
-        for (let span of body.children) {
-          const { left: l1, top: t1 } = bounds(span);
-          const [x, y] = [l1 - l0, t1 - t0];
-          // Check for l1 to ensure we exclude the script element.
-          // Then, hit test for the sock.
-          if (l1 && ctx.getImageData(x, y, 1, 1).data[3] > 0) {
-            if (x < xPrev) {
-              row += 1;
-              legs = [false, false];
+        const blob = new Blob([svg], { type: "image/svg+xml;" });
+        const dataUrl = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+          // The svg (100x100px) is almost certainly smaller than the canvas
+          const s = Math.min(w / img.width, h / img.height);
+          ctx.scale(s, s);
+          ctx.drawImage(img, 0, 0);
+
+          let stripeWidth = 2;
+          let row = 0;
+          let legs = [false, false];
+          let xPrev = 0;
+          for (let span of body.children) {
+            const { left: l1, top: t1 } = bounds(span);
+            const [x, y] = [l1 - l0, t1 - t0];
+            // Check for l1 to ensure we exclude the script element.
+            // Then, hit test for the sock.
+            if (l1 && ctx.getImageData(x, y, 1, 1).data[3] > 0) {
+              if (x < xPrev) {
+                row += 1;
+                legs = [false, false];
+              }
+              xPrev = x;
+              // Offset the second leg by 1 row for more interesting stripe variation
+              let offset = legs[1] ? 0 : 1;
+              span.style.color =
+                Math.floor((row + offset) / stripeWidth) % 2 === 0
+                  ? "#edb5c4"
+                  : "#bbcccc";
+              legs[0] = true;
+            } else {
+              legs[1] = legs[0];
             }
-            xPrev = x;
-            // Offset the second leg by 1 row for more interesting stripe variation
-            let offset = legs[1] ? 0 : 1;
-            span.style.color =
-              Math.floor((row + offset) / stripeWidth) % 2 === 0
-                ? "#edb5c4"
-                : "#bbcccc";
-            legs[0] = true;
-          } else {
-            legs[1] = legs[0];
           }
-        }
+        };
+        img.src = dataUrl;
       };
-      img.src = dataUrl;
     </script>
   </body>
 </html>
